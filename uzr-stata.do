@@ -93,3 +93,57 @@ label variable uzr150_reg "Weighted average UZR/150 (regressed)"
 drop reg_rate
 // Format
 format uzr150* %3.1f
+// Save
+save "$work\estimated_uzr.dta", replace
+
+// 3) Corner OF work 
+use "$work\fielding_2002_2016-05-03_cleaned.dta", clear
+// Generate recency weight
+gen rec_wgt = 5*0.8^(2016-season)
+format rec_wgt %3.2f
+// Keep corner OF only
+keep if pos == 7 | pos == 9
+// Combine corners
+recode pos (7=10) (9=10)
+label define posVL 10 "Corner OF", modify
+// Weighted collapse
+collapse (mean) uzr150 [iweight=rec_wgt*inn], by (playerid name pos)
+// Rebuild regression factor
+tempfile temp1
+preserve
+	use "$work\fielding_2002_2016-05-03_cleaned.dta", clear
+	// Keep corner OF only
+	keep if pos == 7 | pos == 9
+	// Combine corners
+	recode pos (7=10) (9=10)
+	label define posVL 10 "Corner OF", modify
+	// Calculate each player's inning count
+	collapse (max) rec_seas=season (sum) career_inn=inn, by(playerid name pos)
+	// Generate regression rate using 3500 as ideal
+	gen reg_rate = career_inn/3500
+	replace reg_rate = 1 if reg_rate > 1 & reg_rate < 10
+	// Format
+	format reg_rate %3.2fc
+	// Label
+	label variable rec_seas "Most recent season at position"
+	label variable career_inn "Career innings at position"
+	// Save
+	save `temp1'
+restore
+// Merge in regression factor
+merge 1:1 playerid pos using `temp1', assert(2 3) keep(3) nogen
+// Regress
+gen uzr150_reg = uzr150*reg_rate
+// Label
+label variable uzr150 "Weighted average UZR/150 (no regression)"
+label variable uzr150_reg "Weighted average UZR/150 (regressed)"
+drop reg_rate
+// Format
+format uzr150* %3.1f
+// Save
+save "$work\estimated_uzr_corners.dta", replace
+
+// Build full dataset
+clear
+append using "$work\estimated_uzr.dta" "$work\estimated_uzr_corners.dta"
+label define posVL 10 "Corner OF", modify
