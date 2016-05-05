@@ -81,18 +81,37 @@ use "$work\fielding_2002_2016-05-03_cleaned.dta", clear
 // player. We might find it breaks later.. We'll see.
 gen rec_wgt = 5*0.8^(2016-season)
 format rec_wgt %3.2f
+// Express components as rates to get a relative sense
+foreach var in arm dpr rngr errr uzr{
+gen `var'_1458 = `var'/inn*1458
+}
 // Weighted collapse (weight with both innings and recency weight
-collapse (mean) uzr150 [iweight=rec_wgt*inn], by (playerid name pos)
+collapse (mean) *_1458 uzr150 [iweight=rec_wgt*inn], by (playerid name pos)
 // Merge in regression factor
 merge 1:1 playerid pos using "$work\career_summary.dta", assert(2 3) keep(3) nogen
 // Regress
 gen uzr150_reg = uzr150*reg_rate
+foreach var in arm dpr rngr errr uzr{
+gen `var'_1458_reg = `var'_1458*reg_rate
+}
+drop reg_rate
+// Order
+order playerid name pos rec_seas career_inn uzr150 arm_1458 dpr_1458 rngr_1458 errr_1458 uzr_1458  uzr150_reg arm_1458_reg dpr_1458_reg rngr_1458_reg errr_1458_reg uzr_1458_reg
 // Label
 label variable uzr150 "Weighted average UZR/150 (no regression)"
 label variable uzr150_reg "Weighted average UZR/150 (regressed)"
-drop reg_rate
+label variable arm_1458 "Weighted average arm runs per 1458 innings"
+label variable dpr_1458 "Weighted average double play runs per 1458 innings"
+label variable rngr_1458 "Weighted average range runs per 1458 innings"
+label variable errr_1458 "Weighted average error runs per 1458 innings"
+label variable uzr_1458 "Weighted average UZR per 1458 innings"
+label variable arm_1458_reg "Weighted average arm runs per 1458 innings (regressed)"
+label variable dpr_1458_reg "Weighted average double play runs per 1458 innings (regressed)"
+label variable rngr_1458_reg "Weighted average range runs per 1458 innings (regressed)"
+label variable errr_1458_reg "Weighted average error runs per 1458 innings (regressed)"
+label variable uzr_1458_reg "Weighted average UZR per 1458 innings (regressed)"
 // Format
-format uzr150* %3.1f
+format uzr150 arm_1458 dpr_1458 rngr_1458 errr_1458 uzr_1458 uzr150_reg arm_1458_reg dpr_1458_reg rngr_1458_reg errr_1458_reg uzr_1458_reg %3.1f
 // Save
 save "$work\estimated_uzr.dta", replace
 
